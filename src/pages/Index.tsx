@@ -1,102 +1,47 @@
 import { useState } from "react";
-import { Calculator, BookText, Atom, Globe2, FlaskConical, History, Palette, Music } from "lucide-react";
+import { useTelegram } from "@/contexts/TelegramContext";
+import { useSubjects, useCart, useAddToCart, useFavorites, useToggleFavorite } from "@/hooks/useData";
 import { HeroSection } from "@/components/HeroSection";
 import { CategoryTabs } from "@/components/CategoryTabs";
 import { SubjectCard } from "@/components/SubjectCard";
 import { BottomNav } from "@/components/BottomNav";
 import { ProfileSection } from "@/components/ProfileSection";
 import { SupportSection } from "@/components/SupportSection";
-
-const subjects = [
-  {
-    id: 1,
-    icon: Calculator,
-    title: "Математика (профиль)",
-    description: "Полный комплект с решениями",
-    price: 990,
-    originalPrice: 1490,
-    examType: "ЕГЭ" as const,
-    popular: true,
-    category: "ege",
-  },
-  {
-    id: 2,
-    icon: BookText,
-    title: "Русский язык",
-    description: "Все типы заданий + сочинения",
-    price: 890,
-    originalPrice: 1290,
-    examType: "ЕГЭ" as const,
-    popular: true,
-    category: "ege",
-  },
-  {
-    id: 3,
-    icon: Globe2,
-    title: "Обществознание",
-    description: "Теория и практика",
-    price: 790,
-    examType: "ЕГЭ" as const,
-    category: "ege",
-  },
-  {
-    id: 4,
-    icon: Atom,
-    title: "Физика",
-    description: "Формулы и задачи",
-    price: 890,
-    examType: "ЕГЭ" as const,
-    category: "ege",
-  },
-  {
-    id: 5,
-    icon: Calculator,
-    title: "Математика",
-    description: "Алгебра и геометрия",
-    price: 590,
-    originalPrice: 890,
-    examType: "ОГЭ" as const,
-    popular: true,
-    category: "oge",
-  },
-  {
-    id: 6,
-    icon: BookText,
-    title: "Русский язык",
-    description: "Изложение и сочинение",
-    price: 490,
-    examType: "ОГЭ" as const,
-    category: "oge",
-  },
-  {
-    id: 7,
-    icon: FlaskConical,
-    title: "Химия",
-    description: "Реакции и расчёты",
-    price: 690,
-    examType: "ЕГЭ" as const,
-    category: "ege",
-  },
-  {
-    id: 8,
-    icon: History,
-    title: "История",
-    description: "Даты и события",
-    price: 790,
-    examType: "ЕГЭ" as const,
-    category: "ege",
-  },
-];
+import { CartSection } from "@/components/CartSection";
+import { Loader2 } from "lucide-react";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("home");
   const [activeCategory, setActiveCategory] = useState("all");
+  
+  const { isLoading: authLoading } = useTelegram();
+  const { data: subjects, isLoading: subjectsLoading } = useSubjects(activeCategory === "all" ? undefined : activeCategory);
+  const { data: cart } = useCart();
+  const { data: favorites } = useFavorites();
+  const addToCart = useAddToCart();
+  const toggleFavorite = useToggleFavorite();
 
-  const filteredSubjects = subjects.filter((subject) => {
-    if (activeCategory === "all") return true;
-    if (activeCategory === "popular") return subject.popular;
-    return subject.category === activeCategory;
-  });
+  const cartCount = cart?.length || 0;
+  const favoriteIds = new Set(favorites?.map(f => f.subject_id) || []);
+
+  const handleAddToCart = (subjectId: string) => {
+    addToCart.mutate(subjectId);
+  };
+
+  const handleToggleFavorite = (subjectId: string) => {
+    toggleFavorite.mutate(subjectId);
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Загрузка...</p>
+        </div>
+      </div>
+    );
+  }
 
   const renderContent = () => {
     switch (activeTab) {
@@ -108,11 +53,30 @@ const Index = () => {
               <div className="mb-4">
                 <CategoryTabs activeCategory={activeCategory} onCategoryChange={setActiveCategory} />
               </div>
-              <div className="space-y-4">
-                {filteredSubjects.map((subject) => (
-                  <SubjectCard key={subject.id} {...subject} />
-                ))}
-              </div>
+              {subjectsLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {subjects?.map((subject) => (
+                    <SubjectCard
+                      key={subject.id}
+                      id={subject.id}
+                      icon={subject.icon}
+                      title={subject.title}
+                      description={subject.description || ""}
+                      price={subject.price}
+                      originalPrice={subject.original_price || undefined}
+                      examType={subject.exam_type as "ЕГЭ" | "ОГЭ"}
+                      popular={subject.is_popular || false}
+                      isFavorite={favoriteIds.has(subject.id)}
+                      onAddToCart={handleAddToCart}
+                      onToggleFavorite={handleToggleFavorite}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </>
         );
@@ -121,13 +85,34 @@ const Index = () => {
           <div className="p-4 pb-24">
             <h2 className="text-2xl font-bold text-foreground mb-4">Каталог</h2>
             <CategoryTabs activeCategory={activeCategory} onCategoryChange={setActiveCategory} />
-            <div className="mt-4 space-y-4">
-              {filteredSubjects.map((subject) => (
-                <SubjectCard key={subject.id} {...subject} />
-              ))}
-            </div>
+            {subjectsLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="mt-4 space-y-4">
+                {subjects?.map((subject) => (
+                  <SubjectCard
+                    key={subject.id}
+                    id={subject.id}
+                    icon={subject.icon}
+                    title={subject.title}
+                    description={subject.description || ""}
+                    price={subject.price}
+                    originalPrice={subject.original_price || undefined}
+                    examType={subject.exam_type as "ЕГЭ" | "ОГЭ"}
+                    popular={subject.is_popular || false}
+                    isFavorite={favoriteIds.has(subject.id)}
+                    onAddToCart={handleAddToCart}
+                    onToggleFavorite={handleToggleFavorite}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         );
+      case "cart":
+        return <CartSection />;
       case "profile":
         return <ProfileSection />;
       case "support":
@@ -139,16 +124,13 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Status bar area */}
       <div className="h-safe-top bg-background" />
       
-      {/* Main content */}
       <main className="max-w-lg mx-auto">
         {renderContent()}
       </main>
       
-      {/* Bottom Navigation */}
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} cartCount={cartCount} />
     </div>
   );
 };
