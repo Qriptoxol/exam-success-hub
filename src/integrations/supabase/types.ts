@@ -14,7 +14,236 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      cart_items: {
+        Row: {
+          created_at: string
+          id: string
+          profile_id: string
+          subject_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          profile_id: string
+          subject_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          profile_id?: string
+          subject_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cart_items_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cart_items_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      favorites: {
+        Row: {
+          created_at: string
+          id: string
+          profile_id: string
+          subject_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          profile_id: string
+          subject_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          profile_id?: string
+          subject_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "favorites_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "favorites_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_items: {
+        Row: {
+          created_at: string
+          id: string
+          order_id: string
+          price: number
+          subject_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          order_id: string
+          price: number
+          subject_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          order_id?: string
+          price?: number
+          subject_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          created_at: string
+          id: string
+          profile_id: string
+          status: Database["public"]["Enums"]["order_status"]
+          telegram_payment_charge_id: string | null
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          profile_id: string
+          status?: Database["public"]["Enums"]["order_status"]
+          telegram_payment_charge_id?: string | null
+          total_amount: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          profile_id?: string
+          status?: Database["public"]["Enums"]["order_status"]
+          telegram_payment_charge_id?: string | null
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          photo_url: string | null
+          telegram_id: number
+          updated_at: string
+          username: string | null
+        }
+        Insert: {
+          created_at?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          photo_url?: string | null
+          telegram_id: number
+          updated_at?: string
+          username?: string | null
+        }
+        Update: {
+          created_at?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          photo_url?: string | null
+          telegram_id?: number
+          updated_at?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
+      subjects: {
+        Row: {
+          created_at: string
+          demo_content: string | null
+          description: string | null
+          exam_type: Database["public"]["Enums"]["exam_type"]
+          full_content: string | null
+          icon: string
+          id: string
+          is_active: boolean | null
+          is_popular: boolean | null
+          original_price: number | null
+          price: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          demo_content?: string | null
+          description?: string | null
+          exam_type: Database["public"]["Enums"]["exam_type"]
+          full_content?: string | null
+          icon?: string
+          id?: string
+          is_active?: boolean | null
+          is_popular?: boolean | null
+          original_price?: number | null
+          price: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          demo_content?: string | null
+          description?: string | null
+          exam_type?: Database["public"]["Enums"]["exam_type"]
+          full_content?: string | null
+          icon?: string
+          id?: string
+          is_active?: boolean | null
+          is_popular?: boolean | null
+          original_price?: number | null
+          price?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +252,8 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      exam_type: "ЕГЭ" | "ОГЭ"
+      order_status: "pending" | "paid" | "delivered" | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +380,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      exam_type: ["ЕГЭ", "ОГЭ"],
+      order_status: ["pending", "paid", "delivered", "cancelled"],
+    },
   },
 } as const
