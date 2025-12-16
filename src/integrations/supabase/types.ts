@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_users: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       cart_items: {
         Row: {
           created_at: string
@@ -168,6 +189,7 @@ export type Database = {
           created_at: string
           first_name: string | null
           id: string
+          is_blocked: boolean
           last_name: string | null
           photo_url: string | null
           telegram_id: number
@@ -178,6 +200,7 @@ export type Database = {
           created_at?: string
           first_name?: string | null
           id?: string
+          is_blocked?: boolean
           last_name?: string | null
           photo_url?: string | null
           telegram_id: number
@@ -188,11 +211,45 @@ export type Database = {
           created_at?: string
           first_name?: string | null
           id?: string
+          is_blocked?: boolean
           last_name?: string | null
           photo_url?: string | null
           telegram_id?: number
           updated_at?: string
           username?: string | null
+        }
+        Relationships: []
+      }
+      promo_codes: {
+        Row: {
+          code: string
+          created_at: string
+          current_uses: number
+          discount_percent: number
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          max_uses: number | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          current_uses?: number
+          discount_percent: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          current_uses?: number
+          discount_percent?: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
         }
         Relationships: []
       }
@@ -249,9 +306,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
+      app_role: "admin" | "moderator"
       exam_type: "ЕГЭ" | "ОГЭ"
       order_status: "pending" | "paid" | "delivered" | "cancelled"
     }
@@ -381,6 +445,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "moderator"],
       exam_type: ["ЕГЭ", "ОГЭ"],
       order_status: ["pending", "paid", "delivered", "cancelled"],
     },
