@@ -108,6 +108,11 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Handle GET requests (health checks, webhook verification)
+  if (req.method === "GET") {
+    return new Response("Telegram webhook is active", { status: 200, headers: corsHeaders });
+  }
+
   try {
     const botToken = Deno.env.get("TELEGRAM_BOT_TOKEN");
     if (!botToken) {
@@ -119,7 +124,21 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const update: TelegramUpdate = await req.json();
+    // Check if body is empty
+    const body = await req.text();
+    if (!body || body.trim() === "") {
+      console.log("Empty request body received");
+      return new Response("OK", { status: 200 });
+    }
+
+    let update: TelegramUpdate;
+    try {
+      update = JSON.parse(body);
+    } catch (parseError) {
+      console.error("Failed to parse JSON:", parseError);
+      return new Response("OK", { status: 200 });
+    }
+    
     console.log("Received Telegram update:", JSON.stringify(update));
 
     // Handle /start command
