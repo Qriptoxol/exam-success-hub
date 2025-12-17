@@ -47,6 +47,7 @@ interface TelegramUpdate {
       first_name: string;
     };
     message?: {
+      message_id: number;
       chat: {
         id: number;
       };
@@ -54,6 +55,34 @@ interface TelegramUpdate {
     data?: string;
   };
 }
+
+// Reply keyboard that stays at the bottom
+const replyKeyboard = {
+  keyboard: [
+    [{ text: "📚 ЕГЭ" }, { text: "📖 ОГЭ" }],
+    [{ text: "🛒 Мои заказы" }, { text: "🎁 Промокод" }],
+    [{ text: "🏠 Главное меню" }],
+  ],
+  resize_keyboard: true,
+  persistent: true,
+};
+
+// Inline keyboard for menu
+const menuInlineKeyboard = {
+  inline_keyboard: [
+    [
+      { text: "📚 ЕГЭ", callback_data: "category_ЕГЭ" },
+      { text: "📖 ОГЭ", callback_data: "category_ОГЭ" },
+    ],
+    [
+      { text: "🛒 Мои заказы", callback_data: "my_orders" },
+      { text: "🎁 Промокод", callback_data: "promo" },
+    ],
+    [
+      { text: "🛍 Открыть магазин", web_app: { url: "https://ewmstejympjtlejzoowb.lovable.app" } },
+    ],
+  ],
+};
 
 async function sendTelegramMessage(
   botToken: string, 
@@ -74,6 +103,43 @@ async function sendTelegramMessage(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+  });
+  return response.json();
+}
+
+async function editMessageText(
+  botToken: string,
+  chatId: number,
+  messageId: number,
+  text: string,
+  replyMarkup?: any
+) {
+  const body: any = {
+    chat_id: chatId,
+    message_id: messageId,
+    text,
+    parse_mode: "HTML",
+  };
+  if (replyMarkup) {
+    body.reply_markup = replyMarkup;
+  }
+  
+  const response = await fetch(`https://api.telegram.org/bot${botToken}/editMessageText`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return response.json();
+}
+
+async function deleteMessage(botToken: string, chatId: number, messageId: number) {
+  const response = await fetch(`https://api.telegram.org/bot${botToken}/deleteMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      message_id: messageId,
+    }),
   });
   return response.json();
 }
@@ -108,7 +174,6 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Handle GET requests (health checks, webhook verification)
   if (req.method === "GET") {
     return new Response("Telegram webhook is active", { status: 200, headers: corsHeaders });
   }
@@ -124,7 +189,6 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Check if body is empty
     const body = await req.text();
     if (!body || body.trim() === "") {
       console.log("Empty request body received");
@@ -141,162 +205,254 @@ serve(async (req) => {
     
     console.log("Received Telegram update:", JSON.stringify(update));
 
-    // Handle /start command
-    if (update.message?.text?.startsWith("/start")) {
-      const chatId = update.message.chat.id;
-      const firstName = update.message.from.first_name;
-      
-      const keyboard = {
-        inline_keyboard: [
-          [
-            { text: "📚 ЕГЭ", callback_data: "category_ЕГЭ" },
-            { text: "📖 ОГЭ", callback_data: "category_ОГЭ" },
-          ],
-          [
-            { text: "🛒 Мои заказы", callback_data: "my_orders" },
-            { text: "🎁 Промокод", callback_data: "promo" },
-          ],
-          [
-            { text: "🛍 Открыть магазин", web_app: { url: "https://ewmstejympjtlejzoowb.lovable.app" } },
-          ],
-        ],
-      };
-      
-      await sendTelegramMessage(
-        botToken,
-        chatId,
-        `👋 Привет, ${firstName}!\n\n` +
-        `Добро пожаловать в <b>ExamShop</b> — магазин ответов на ЕГЭ и ОГЭ 2025!\n\n` +
-        `📚 У нас вы найдёте:\n` +
-        `• Математика (профиль и база)\n` +
-        `• Русский язык\n` +
-        `• Обществознание\n` +
-        `• Физика, химия, история\n` +
-        `• И другие предметы!\n\n` +
-        `Выберите категорию или откройте магазин:`,
-        keyboard
-      );
-    }
-
-    // Handle /orders command
-    if (update.message?.text?.startsWith("/orders")) {
-      const chatId = update.message.chat.id;
-      const telegramId = update.message.from.id;
-      
-      // Get profile
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("telegram_id", telegramId)
-        .maybeSingle();
-
-      if (!profile) {
-        await sendTelegramMessage(botToken, chatId, "❌ Вы ещё не зарегистрированы. Откройте магазин через кнопку ниже.");
-        return new Response("OK", { status: 200 });
-      }
-
-      const { data: orders } = await supabase
-        .from("orders")
-        .select("*, order_items(subject:subjects(title))")
-        .eq("profile_id", profile.id)
-        .order("created_at", { ascending: false })
-        .limit(10);
-
-      if (!orders || orders.length === 0) {
-        await sendTelegramMessage(botToken, chatId, "📭 У вас пока нет заказов.\n\nОткройте магазин, чтобы сделать первую покупку!");
-        return new Response("OK", { status: 200 });
-      }
-
-      const statusEmoji: Record<string, string> = {
-        pending: "⏳",
-        paid: "✅",
-        delivered: "📬",
-        cancelled: "❌",
-      };
-
-      const statusText: Record<string, string> = {
-        pending: "Ожидает оплаты",
-        paid: "Оплачен",
-        delivered: "Доставлен",
-        cancelled: "Отменён",
-      };
-
-      let message = "📦 <b>Ваши заказы:</b>\n\n";
-      for (const order of orders) {
-        const items = (order as any).order_items?.map((item: any) => item.subject?.title).filter(Boolean).join(", ") || "—";
-        const date = new Date(order.created_at).toLocaleDateString("ru-RU");
-        message += `${statusEmoji[order.status]} <b>#${order.id.slice(0, 8)}</b>\n`;
-        message += `📅 ${date} • ${order.total_amount} ⭐\n`;
-        message += `📚 ${items}\n`;
-        message += `Статус: ${statusText[order.status]}\n\n`;
-      }
-
-      await sendTelegramMessage(botToken, chatId, message);
-    }
-
-    // Handle /promo command
-    if (update.message?.text?.startsWith("/promo")) {
+    // Handle text messages (commands and reply keyboard)
+    if (update.message?.text) {
       const chatId = update.message.chat.id;
       const text = update.message.text;
-      const parts = text.split(" ");
-      
-      if (parts.length < 2) {
+      const firstName = update.message.from.first_name;
+      const telegramId = update.message.from.id;
+      const userMessageId = update.message.message_id;
+
+      // Delete user's message to keep chat clean (except for promo codes)
+      if (!text.startsWith("/promo ") && !text.match(/^[A-ZА-Я0-9]+$/i)) {
+        try {
+          await deleteMessage(botToken, chatId, userMessageId);
+        } catch (e) {
+          console.log("Could not delete user message");
+        }
+      }
+
+      // /start or 🏠 Главное меню
+      if (text === "/start" || text === "🏠 Главное меню") {
         await sendTelegramMessage(
-          botToken, 
-          chatId, 
-          "🎁 <b>Промокоды</b>\n\n" +
-          "Чтобы применить промокод, введите:\n" +
-          "<code>/promo КОД</code>\n\n" +
-          "Например: /promo DISCOUNT10"
+          botToken,
+          chatId,
+          `👋 Привет, ${firstName}!\n\n` +
+          `Добро пожаловать в <b>ExamShop</b> — магазин ответов на ЕГЭ и ОГЭ 2025!\n\n` +
+          `📚 У нас вы найдёте:\n` +
+          `• Математика (профиль и база)\n` +
+          `• Русский язык\n` +
+          `• Обществознание\n` +
+          `• Физика, химия, история\n` +
+          `• И другие предметы!\n\n` +
+          `Выберите категорию:`,
+          { ...menuInlineKeyboard, ...replyKeyboard }
         );
         return new Response("OK", { status: 200 });
       }
 
-      const code = parts[1].toUpperCase();
-      const { data: promo } = await supabase
-        .from("promo_codes")
-        .select("*")
-        .eq("code", code)
-        .eq("is_active", true)
-        .maybeSingle();
+      // 📚 ЕГЭ button
+      if (text === "📚 ЕГЭ") {
+        const { data: subjects } = await supabase
+          .from("subjects")
+          .select("*")
+          .eq("exam_type", "ЕГЭ")
+          .eq("is_active", true)
+          .limit(10);
 
-      if (!promo) {
-        await sendTelegramMessage(botToken, chatId, "❌ Промокод не найден или недействителен.");
+        let message = `📚 <b>ЕГЭ — Доступные предметы:</b>\n\n`;
+        if (subjects && subjects.length > 0) {
+          for (const subject of subjects) {
+            const discount = subject.original_price ? Math.round((1 - subject.price / subject.original_price) * 100) : 0;
+            message += `📖 <b>${subject.title}</b>\n`;
+            message += `💰 ${subject.price} ⭐`;
+            if (discount > 0) {
+              message += ` <s>${subject.original_price} ⭐</s> (-${discount}%)`;
+            }
+            message += `\n\n`;
+          }
+        } else {
+          message += "Предметы не найдены.";
+        }
+
+        const keyboard = {
+          inline_keyboard: [
+            [{ text: "🛍 Открыть магазин", web_app: { url: "https://ewmstejympjtlejzoowb.lovable.app" } }],
+          ],
+        };
+
+        await sendTelegramMessage(botToken, chatId, message, keyboard);
         return new Response("OK", { status: 200 });
       }
 
-      if (promo.max_uses && promo.current_uses >= promo.max_uses) {
-        await sendTelegramMessage(botToken, chatId, "❌ Этот промокод уже использован максимальное количество раз.");
+      // 📖 ОГЭ button
+      if (text === "📖 ОГЭ") {
+        const { data: subjects } = await supabase
+          .from("subjects")
+          .select("*")
+          .eq("exam_type", "ОГЭ")
+          .eq("is_active", true)
+          .limit(10);
+
+        let message = `📖 <b>ОГЭ — Доступные предметы:</b>\n\n`;
+        if (subjects && subjects.length > 0) {
+          for (const subject of subjects) {
+            const discount = subject.original_price ? Math.round((1 - subject.price / subject.original_price) * 100) : 0;
+            message += `📖 <b>${subject.title}</b>\n`;
+            message += `💰 ${subject.price} ⭐`;
+            if (discount > 0) {
+              message += ` <s>${subject.original_price} ⭐</s> (-${discount}%)`;
+            }
+            message += `\n\n`;
+          }
+        } else {
+          message += "Предметы не найдены.";
+        }
+
+        const keyboard = {
+          inline_keyboard: [
+            [{ text: "🛍 Открыть магазин", web_app: { url: "https://ewmstejympjtlejzoowb.lovable.app" } }],
+          ],
+        };
+
+        await sendTelegramMessage(botToken, chatId, message, keyboard);
         return new Response("OK", { status: 200 });
       }
 
-      if (promo.expires_at && new Date(promo.expires_at) < new Date()) {
-        await sendTelegramMessage(botToken, chatId, "❌ Срок действия промокода истёк.");
+      // 🛒 Мои заказы button or /orders
+      if (text === "🛒 Мои заказы" || text === "/orders") {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("telegram_id", telegramId)
+          .maybeSingle();
+
+        if (!profile) {
+          const keyboard = {
+            inline_keyboard: [
+              [{ text: "🛍 Открыть магазин", web_app: { url: "https://ewmstejympjtlejzoowb.lovable.app" } }],
+            ],
+          };
+          await sendTelegramMessage(botToken, chatId, "❌ Вы ещё не зарегистрированы.\n\nОткройте магазин, чтобы начать!", keyboard);
+          return new Response("OK", { status: 200 });
+        }
+
+        const { data: orders } = await supabase
+          .from("orders")
+          .select("*, order_items(subject:subjects(title))")
+          .eq("profile_id", profile.id)
+          .order("created_at", { ascending: false })
+          .limit(10);
+
+        if (!orders || orders.length === 0) {
+          const keyboard = {
+            inline_keyboard: [
+              [{ text: "🛍 Открыть магазин", web_app: { url: "https://ewmstejympjtlejzoowb.lovable.app" } }],
+            ],
+          };
+          await sendTelegramMessage(botToken, chatId, "📭 У вас пока нет заказов.\n\nОткройте магазин, чтобы сделать первую покупку!", keyboard);
+          return new Response("OK", { status: 200 });
+        }
+
+        const statusEmoji: Record<string, string> = { pending: "⏳", paid: "✅", delivered: "📬", cancelled: "❌" };
+        const statusText: Record<string, string> = { pending: "Ожидает оплаты", paid: "Оплачен", delivered: "Доставлен", cancelled: "Отменён" };
+
+        let message = "📦 <b>Ваши заказы:</b>\n\n";
+        for (const order of orders) {
+          const items = (order as any).order_items?.map((item: any) => item.subject?.title).filter(Boolean).join(", ") || "—";
+          const date = new Date(order.created_at).toLocaleDateString("ru-RU");
+          message += `${statusEmoji[order.status]} <b>#${order.id.slice(0, 8)}</b>\n`;
+          message += `📅 ${date} • ${order.total_amount} ⭐\n`;
+          message += `📚 ${items}\n`;
+          message += `Статус: ${statusText[order.status]}\n\n`;
+        }
+
+        await sendTelegramMessage(botToken, chatId, message);
         return new Response("OK", { status: 200 });
       }
 
-      await sendTelegramMessage(
-        botToken, 
-        chatId, 
-        `✅ <b>Промокод найден!</b>\n\n` +
-        `🎁 Код: <code>${promo.code}</code>\n` +
-        `💰 Скидка: <b>${promo.discount_percent}%</b>\n\n` +
-        `Используйте его при оформлении заказа в магазине.`
-      );
+      // 🎁 Промокод button
+      if (text === "🎁 Промокод") {
+        await sendTelegramMessage(
+          botToken,
+          chatId,
+          "🎁 <b>Промокоды</b>\n\n" +
+          "Введите промокод в чат:\n\n" +
+          "Например: <code>DISCOUNT10</code>"
+        );
+        return new Response("OK", { status: 200 });
+      }
+
+      // /promo command
+      if (text.startsWith("/promo ")) {
+        const code = text.replace("/promo ", "").toUpperCase().trim();
+        const { data: promo } = await supabase
+          .from("promo_codes")
+          .select("*")
+          .eq("code", code)
+          .eq("is_active", true)
+          .maybeSingle();
+
+        if (!promo) {
+          await sendTelegramMessage(botToken, chatId, "❌ Промокод не найден или недействителен.");
+          return new Response("OK", { status: 200 });
+        }
+
+        if (promo.max_uses && promo.current_uses >= promo.max_uses) {
+          await sendTelegramMessage(botToken, chatId, "❌ Этот промокод уже использован максимальное количество раз.");
+          return new Response("OK", { status: 200 });
+        }
+
+        if (promo.expires_at && new Date(promo.expires_at) < new Date()) {
+          await sendTelegramMessage(botToken, chatId, "❌ Срок действия промокода истёк.");
+          return new Response("OK", { status: 200 });
+        }
+
+        await sendTelegramMessage(
+          botToken,
+          chatId,
+          `✅ <b>Промокод найден!</b>\n\n` +
+          `🎁 Код: <code>${promo.code}</code>\n` +
+          `💰 Скидка: <b>${promo.discount_percent}%</b>\n\n` +
+          `Используйте его при оформлении заказа в магазине.`
+        );
+        return new Response("OK", { status: 200 });
+      }
+
+      // Check if text is a promo code (all caps/numbers)
+      if (text.match(/^[A-ZА-ЯЁ0-9]{3,20}$/i)) {
+        const code = text.toUpperCase();
+        const { data: promo } = await supabase
+          .from("promo_codes")
+          .select("*")
+          .eq("code", code)
+          .eq("is_active", true)
+          .maybeSingle();
+
+        if (promo) {
+          if (promo.max_uses && promo.current_uses >= promo.max_uses) {
+            await sendTelegramMessage(botToken, chatId, "❌ Этот промокод уже использован максимальное количество раз.");
+          } else if (promo.expires_at && new Date(promo.expires_at) < new Date()) {
+            await sendTelegramMessage(botToken, chatId, "❌ Срок действия промокода истёк.");
+          } else {
+            await sendTelegramMessage(
+              botToken,
+              chatId,
+              `✅ <b>Промокод найден!</b>\n\n` +
+              `🎁 Код: <code>${promo.code}</code>\n` +
+              `💰 Скидка: <b>${promo.discount_percent}%</b>\n\n` +
+              `Используйте его при оформлении заказа в магазине.`
+            );
+          }
+          return new Response("OK", { status: 200 });
+        }
+      }
     }
 
-    // Handle callback queries (inline buttons)
+    // Handle callback queries (inline buttons) - edit message instead of sending new
     if (update.callback_query) {
       const query = update.callback_query;
       const chatId = query.message?.chat.id;
+      const messageId = query.message?.message_id;
       const data = query.data;
+      const telegramId = query.from.id;
 
-      if (!chatId) {
+      if (!chatId || !messageId) {
         await answerCallbackQuery(botToken, query.id);
         return new Response("OK", { status: 200 });
       }
 
-      // Category selection
+      // Category selection - edit message
       if (data?.startsWith("category_")) {
         const examType = data.replace("category_", "");
         
@@ -307,23 +463,20 @@ serve(async (req) => {
           .eq("is_active", true)
           .limit(10);
 
-        if (!subjects || subjects.length === 0) {
-          await answerCallbackQuery(botToken, query.id, "Предметы не найдены");
-          return new Response("OK", { status: 200 });
-        }
-
         let message = `📚 <b>${examType} — Доступные предметы:</b>\n\n`;
-        for (const subject of subjects) {
-          const discount = subject.original_price ? Math.round((1 - subject.price / subject.original_price) * 100) : 0;
-          message += `📖 <b>${subject.title}</b>\n`;
-          message += `💰 ${subject.price} ⭐`;
-          if (discount > 0) {
-            message += ` <s>${subject.original_price} ⭐</s> (-${discount}%)`;
+        if (subjects && subjects.length > 0) {
+          for (const subject of subjects) {
+            const discount = subject.original_price ? Math.round((1 - subject.price / subject.original_price) * 100) : 0;
+            message += `📖 <b>${subject.title}</b>\n`;
+            message += `💰 ${subject.price} ⭐`;
+            if (discount > 0) {
+              message += ` <s>${subject.original_price} ⭐</s> (-${discount}%)`;
+            }
+            message += `\n\n`;
           }
-          message += `\n\n`;
+        } else {
+          message += "Предметы не найдены.";
         }
-
-        message += `\n🛍 Откройте магазин для покупки!`;
 
         const keyboard = {
           inline_keyboard: [
@@ -332,16 +485,13 @@ serve(async (req) => {
           ],
         };
 
-        await sendTelegramMessage(botToken, chatId, message, keyboard);
+        await editMessageText(botToken, chatId, messageId, message, keyboard);
         await answerCallbackQuery(botToken, query.id);
+        return new Response("OK", { status: 200 });
       }
 
-      // My orders button
+      // My orders - edit message
       if (data === "my_orders") {
-        await answerCallbackQuery(botToken, query.id);
-        // Trigger orders command logic
-        const telegramId = query.from.id;
-        
         const { data: profile } = await supabase
           .from("profiles")
           .select("id")
@@ -349,7 +499,15 @@ serve(async (req) => {
           .maybeSingle();
 
         if (!profile) {
-          await sendTelegramMessage(botToken, chatId, "❌ Вы ещё не зарегистрированы. Откройте магазин через кнопку.");
+          await editMessageText(
+            botToken, chatId, messageId,
+            "❌ Вы ещё не зарегистрированы.\n\nОткройте магазин, чтобы начать!",
+            { inline_keyboard: [
+              [{ text: "🛍 Открыть магазин", web_app: { url: "https://ewmstejympjtlejzoowb.lovable.app" } }],
+              [{ text: "⬅️ Назад", callback_data: "back_to_menu" }],
+            ]}
+          );
+          await answerCallbackQuery(botToken, query.id);
           return new Response("OK", { status: 200 });
         }
 
@@ -360,85 +518,76 @@ serve(async (req) => {
           .order("created_at", { ascending: false })
           .limit(5);
 
+        let message: string;
         if (!orders || orders.length === 0) {
-          await sendTelegramMessage(botToken, chatId, "📭 У вас пока нет заказов.");
-          return new Response("OK", { status: 200 });
+          message = "📭 У вас пока нет заказов.\n\nОткройте магазин, чтобы сделать первую покупку!";
+        } else {
+          const statusEmoji: Record<string, string> = { pending: "⏳", paid: "✅", delivered: "📬", cancelled: "❌" };
+          message = "📦 <b>Ваши последние заказы:</b>\n\n";
+          for (const order of orders) {
+            const items = (order as any).order_items?.map((item: any) => item.subject?.title).filter(Boolean).join(", ") || "—";
+            message += `${statusEmoji[order.status]} #${order.id.slice(0, 8)} • ${order.total_amount} ⭐\n`;
+            message += `📚 ${items}\n\n`;
+          }
         }
 
-        const statusEmoji: Record<string, string> = {
-          pending: "⏳",
-          paid: "✅",
-          delivered: "📬",
-          cancelled: "❌",
-        };
-
-        let message = "📦 <b>Ваши последние заказы:</b>\n\n";
-        for (const order of orders) {
-          const items = (order as any).order_items?.map((item: any) => item.subject?.title).filter(Boolean).join(", ") || "—";
-          message += `${statusEmoji[order.status]} #${order.id.slice(0, 8)} • ${order.total_amount} ⭐\n`;
-          message += `📚 ${items}\n\n`;
-        }
-
-        await sendTelegramMessage(botToken, chatId, message);
-      }
-
-      // Promo button
-      if (data === "promo") {
-        await answerCallbackQuery(botToken, query.id);
-        await sendTelegramMessage(
-          botToken,
-          chatId,
-          "🎁 <b>Промокоды</b>\n\n" +
-          "Чтобы применить промокод, введите:\n" +
-          "<code>/promo КОД</code>\n\n" +
-          "Например: /promo DISCOUNT10"
-        );
-      }
-
-      // Back to menu
-      if (data === "back_to_menu") {
-        const keyboard = {
+        await editMessageText(botToken, chatId, messageId, message, {
           inline_keyboard: [
-            [
-              { text: "📚 ЕГЭ", callback_data: "category_ЕГЭ" },
-              { text: "📖 ОГЭ", callback_data: "category_ОГЭ" },
-            ],
-            [
-              { text: "🛒 Мои заказы", callback_data: "my_orders" },
-              { text: "🎁 Промокод", callback_data: "promo" },
-            ],
-            [
-              { text: "🛍 Открыть магазин", web_app: { url: "https://ewmstejympjtlejzoowb.lovable.app" } },
-            ],
+            [{ text: "🛍 Открыть магазин", web_app: { url: "https://ewmstejympjtlejzoowb.lovable.app" } }],
+            [{ text: "⬅️ Назад", callback_data: "back_to_menu" }],
           ],
-        };
-        
-        await sendTelegramMessage(
-          botToken,
-          chatId,
-          "🏠 <b>Главное меню</b>\n\nВыберите действие:",
-          keyboard
+        });
+        await answerCallbackQuery(botToken, query.id);
+        return new Response("OK", { status: 200 });
+      }
+
+      // Promo - edit message
+      if (data === "promo") {
+        await editMessageText(
+          botToken, chatId, messageId,
+          "🎁 <b>Промокоды</b>\n\n" +
+          "Введите промокод в чат:\n\n" +
+          "Например: <code>DISCOUNT10</code>",
+          { inline_keyboard: [[{ text: "⬅️ Назад", callback_data: "back_to_menu" }]] }
         );
         await answerCallbackQuery(botToken, query.id);
+        return new Response("OK", { status: 200 });
       }
+
+      // Back to menu - edit message
+      if (data === "back_to_menu") {
+        await editMessageText(
+          botToken, chatId, messageId,
+          "🏠 <b>Главное меню</b>\n\nВыберите категорию:",
+          menuInlineKeyboard
+        );
+        await answerCallbackQuery(botToken, query.id);
+        return new Response("OK", { status: 200 });
+      }
+
+      await answerCallbackQuery(botToken, query.id);
     }
 
-    // Handle pre-checkout query (Telegram Payments)
+    // Handle pre-checkout query
     if (update.pre_checkout_query) {
       const query = update.pre_checkout_query;
       console.log("Pre-checkout query received:", query.id);
       
-      const payload = JSON.parse(query.invoice_payload);
-      const { data: order } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("id", payload.orderId)
-        .single();
+      try {
+        const payload = JSON.parse(query.invoice_payload);
+        const { data: order } = await supabase
+          .from("orders")
+          .select("*")
+          .eq("id", payload.orderId)
+          .single();
 
-      if (order && order.status === "pending") {
-        await answerPreCheckoutQuery(botToken, query.id, true);
-      } else {
-        await answerPreCheckoutQuery(botToken, query.id, false, "Заказ не найден или уже оплачен");
+        if (order && order.status === "pending") {
+          await answerPreCheckoutQuery(botToken, query.id, true);
+        } else {
+          await answerPreCheckoutQuery(botToken, query.id, false, "Заказ не найден или уже оплачен");
+        }
+      } catch (e) {
+        await answerPreCheckoutQuery(botToken, query.id, false, "Ошибка обработки заказа");
       }
     }
 
