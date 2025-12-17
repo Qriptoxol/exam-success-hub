@@ -79,7 +79,7 @@ const menuInlineKeyboard = {
       { text: "🎁 Промокод", callback_data: "promo" },
     ],
     [
-      { text: "🛍 Открыть магазин", web_app: { url: "https://ewmstejympjtlejzoowb.lovable.app" } },
+      { text: "🛍 Открыть магазин", web_app: { url: "https://exam-succes-hub.vercel.app/" } },
     ],
   ],
 };
@@ -301,7 +301,7 @@ serve(async (req) => {
 
         const keyboard = {
           inline_keyboard: [
-            [{ text: "🛍 Открыть магазин", web_app: { url: "https://ewmstejympjtlejzoowb.lovable.app" } }],
+            [{ text: "🛍 Открыть магазин", web_app: { url: "https://exam-succes-hub.vercel.app/" } }],
           ],
         };
 
@@ -320,7 +320,7 @@ serve(async (req) => {
         if (!profile) {
           const keyboard = {
             inline_keyboard: [
-              [{ text: "🛍 Открыть магазин", web_app: { url: "https://ewmstejympjtlejzoowb.lovable.app" } }],
+              [{ text: "🛍 Открыть магазин", web_app: { url: "https://exam-succes-hub.vercel.app/" } }],
             ],
           };
           await sendTelegramMessage(botToken, chatId, "❌ Вы ещё не зарегистрированы.\n\nОткройте магазин, чтобы начать!", keyboard);
@@ -337,7 +337,7 @@ serve(async (req) => {
         if (!orders || orders.length === 0) {
           const keyboard = {
             inline_keyboard: [
-              [{ text: "🛍 Открыть магазин", web_app: { url: "https://ewmstejympjtlejzoowb.lovable.app" } }],
+              [{ text: "🛍 Открыть магазин", web_app: { url: "https://exam-succes-hub.vercel.app/" } }],
             ],
           };
           await sendTelegramMessage(botToken, chatId, "📭 У вас пока нет заказов.\n\nОткройте магазин, чтобы сделать первую покупку!", keyboard);
@@ -480,7 +480,7 @@ serve(async (req) => {
 
         const keyboard = {
           inline_keyboard: [
-            [{ text: "🛍 Открыть магазин", web_app: { url: "https://ewmstejympjtlejzoowb.lovable.app" } }],
+            [{ text: "🛍 Открыть магазин", web_app: { url: "https://exam-succes-hub.vercel.app/" } }],
             [{ text: "⬅️ Назад", callback_data: "back_to_menu" }],
           ],
         };
@@ -503,7 +503,7 @@ serve(async (req) => {
             botToken, chatId, messageId,
             "❌ Вы ещё не зарегистрированы.\n\nОткройте магазин, чтобы начать!",
             { inline_keyboard: [
-              [{ text: "🛍 Открыть магазин", web_app: { url: "https://ewmstejympjtlejzoowb.lovable.app" } }],
+              [{ text: "🛍 Открыть магазин", web_app: { url: "https://exam-succes-hub.vercel.app/" } }],
               [{ text: "⬅️ Назад", callback_data: "back_to_menu" }],
             ]}
           );
@@ -533,7 +533,7 @@ serve(async (req) => {
 
         await editMessageText(botToken, chatId, messageId, message, {
           inline_keyboard: [
-            [{ text: "🛍 Открыть магазин", web_app: { url: "https://ewmstejympjtlejzoowb.lovable.app" } }],
+            [{ text: "🛍 Открыть магазин", web_app: { url: "https://exam-succes-hub.vercel.app/" } }],
             [{ text: "⬅️ Назад", callback_data: "back_to_menu" }],
           ],
         });
