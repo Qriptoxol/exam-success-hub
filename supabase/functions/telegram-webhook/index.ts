@@ -138,7 +138,7 @@ serve(async (req) => {
             { text: "🎁 Промокод", callback_data: "promo" },
           ],
           [
-            { text: "🛍 Открыть магазин", web_app: { url: `https://${Deno.env.get("SUPABASE_PROJECT_REF") || "ewmstejympjtlejzoowb"}.lovable.app` } },
+            { text: "🛍 Открыть магазин", web_app: { url: "https://ewmstejympjtlejzoowb.lovable.app" } },
           ],
         ],
       };
@@ -308,7 +308,7 @@ serve(async (req) => {
 
         const keyboard = {
           inline_keyboard: [
-            [{ text: "🛍 Открыть магазин", web_app: { url: `https://${Deno.env.get("SUPABASE_PROJECT_REF") || "ewmstejympjtlejzoowb"}.lovable.app` } }],
+            [{ text: "🛍 Открыть магазин", web_app: { url: "https://ewmstejympjtlejzoowb.lovable.app" } }],
             [{ text: "⬅️ Назад", callback_data: "back_to_menu" }],
           ],
         };
@@ -389,7 +389,7 @@ serve(async (req) => {
               { text: "🎁 Промокод", callback_data: "promo" },
             ],
             [
-              { text: "🛍 Открыть магазин", web_app: { url: `https://${Deno.env.get("SUPABASE_PROJECT_REF") || "ewmstejympjtlejzoowb"}.lovable.app` } },
+              { text: "🛍 Открыть магазин", web_app: { url: "https://ewmstejympjtlejzoowb.lovable.app" } },
             ],
           ],
         };
